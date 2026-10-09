@@ -1,0 +1,80 @@
+name: iOS app
+
+# macOS runners count 10x against the free Actions minutes on private repositories,
+# so the app build only runs when app code changes, and UI tests only on request.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "App/**"
+      - "UITests/**"
+      - "UnderlogCore/Sources/**"
+      - "project.yml"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+    inputs:
+      run_ui_tests:
+        description: "Also run the UI tests in the simulator"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build for iOS Simulator
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        run: xcodegen generate
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Underlog.xcodeproj \
+            -scheme Underlog \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO | tee build.log | grep -E "error:|warning:|BUILD" || true
+          grep -q "BUILD SUCCEEDED" build.log
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+  ui-tests:
+    name: UI tests
+    if: github.event_name == 'workflow_dispatch' && inputs.run_ui_tests
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        run: xcodegen generate
+      - name: Pick a simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in sorted(d.items(), reverse=True) if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Underlog.xcodeproj \
+            -scheme Underlog \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO | tee test.log | grep -E "error:|Test Case|TEST" || true
+          grep -q "TEST SUCCEEDED" test.log
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log
+          path: test.log

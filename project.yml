@@ -1,0 +1,87 @@
+name: Underlog
+options:
+  bundleIdPrefix: com.ghajnal
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+packages:
+  UnderlogCore:
+    path: UnderlogCore
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  Underlog:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: UnderlogCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Underlog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.garmin.fit
+            UTTypeDescription: Garmin FIT activity
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [fit]
+          - UTTypeIdentifier: org.streit.uddf
+            UTTypeDescription: Universal Dive Data Format
+            UTTypeConformsTo: [public.xml]
+            UTTypeTagSpecification:
+              public.filename-extension: [uddf]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ghajnal.underlog
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+
+  UnderlogUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Underlog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ghajnal.underlog.uitests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Underlog:
+    build:
+      targets:
+        Underlog: all
+        UnderlogUITests: [test]
+    test:
+      targets:
+        - UnderlogUITests
