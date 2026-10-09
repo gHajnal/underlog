@@ -72,6 +72,16 @@ struct GasToolsView: View {
                     Text("Gas consumption")
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                Text("For reference only. Plan dives with your training, your dive computer and your agency's tables.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(.bar)
+            }
             .navigationTitle("Gas tools")
         }
     }

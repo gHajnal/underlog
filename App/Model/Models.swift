@@ -131,7 +131,11 @@ final class DiveSite {
         self.longitude = longitude
     }
 
-    var hasCoordinates: Bool { latitude != nil && longitude != nil }
+    /// True only for a real position. A damaged import could hold impossible values, which would crash the map.
+    var hasCoordinates: Bool {
+        guard let latitude, let longitude, latitude.isFinite, longitude.isFinite else { return false }
+        return abs(latitude) <= 90 && abs(longitude) <= 180
+    }
 }
 
 @Model
