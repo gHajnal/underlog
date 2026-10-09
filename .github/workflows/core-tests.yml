@@ -16,6 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:6.2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build and test
-        run: swift test --package-path UnderlogCore
+        shell: bash
+        run: |
+          set -o pipefail
+          swift test --package-path UnderlogCore 2>&1 | tee test.log || {
+            # Surface compiler errors and failed expectations as annotations so they show up on the run.
+            # One annotation per chunk of lines (GitHub keeps at most 10 error annotations per step).
+            grep -E "error:|✘|failed|Expectation|recorded an issue" test.log | head -60 \
+              | awk 'BEGIN{ORS=""} {gsub(/%/,"%25"); gsub(/\r/,""); print $0 "%0A"; if (NR%6==0) print "\n"} END{print "\n"}' \
+              | while IFS= read -r chunk; do [ -n "$chunk" ] && echo "::error::${chunk}"; done
+            exit 1
+          }

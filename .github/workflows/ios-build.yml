@@ -24,7 +24,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Show Xcode version
         run: xcodebuild -version
       - name: Install XcodeGen
@@ -33,13 +33,18 @@ jobs:
         run: xcodegen generate
       - name: Build
         run: |
-          set -o pipefail
           xcodebuild build \
             -project Underlog.xcodeproj \
             -scheme Underlog \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO | tee build.log | grep -E "error:|warning:|BUILD" || true
-          grep -q "BUILD SUCCEEDED" build.log
+            CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || true
+          if ! grep -q "BUILD SUCCEEDED" build.log; then
+            grep -E "error:" build.log | sort -u | head -60 \
+              | awk 'BEGIN{ORS=""} {gsub(/%/,"%25"); print $0 "%0A"; if (NR%6==0) print "\n"} END{print "\n"}' \
+              | while IFS= read -r chunk; do [ -n "$chunk" ] && echo "::error::${chunk}"; done
+            tail -30 build.log
+            exit 1
+          fi
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
@@ -53,7 +58,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate the Xcode project
@@ -65,13 +70,17 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Test
         run: |
-          set -o pipefail
           xcodebuild test \
             -project Underlog.xcodeproj \
             -scheme Underlog \
             -destination "id=${{ steps.sim.outputs.udid }}" \
-            CODE_SIGNING_ALLOWED=NO | tee test.log | grep -E "error:|Test Case|TEST" || true
-          grep -q "TEST SUCCEEDED" test.log
+            CODE_SIGNING_ALLOWED=NO > test.log 2>&1 || true
+          if ! grep -q "TEST SUCCEEDED" test.log; then
+            grep -E "error:|failed" test.log | sort -u | head -60 \
+              | awk 'BEGIN{ORS=""} {gsub(/%/,"%25"); print $0 "%0A"; if (NR%6==0) print "\n"} END{print "\n"}' \
+              | while IFS= read -r chunk; do [ -n "$chunk" ] && echo "::error::${chunk}"; done
+            exit 1
+          fi
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
