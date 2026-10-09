@@ -1,7 +1,8 @@
 name: iOS app
 
 # macOS runners count 10x against the free Actions minutes on private repositories,
-# so the app build only runs when app code changes, and UI tests only on request.
+# so the app build only runs when app code changes, and UI tests only on request
+# (manually from the Actions tab, or by putting [ui-tests] in a commit message).
 on:
   push:
     branches: [main]
@@ -22,7 +23,9 @@ jobs:
   build:
     name: Build for iOS Simulator
     # A UI-test run builds the app anyway, so skip the separate build then.
-    if: github.event_name == 'push' || !inputs.run_ui_tests
+    if: >-
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[ui-tests]'))
+      || (github.event_name == 'workflow_dispatch' && !inputs.run_ui_tests)
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -56,7 +59,10 @@ jobs:
 
   ui-tests:
     name: UI tests
-    if: github.event_name == 'workflow_dispatch' && inputs.run_ui_tests
+    # Runs when started manually with the box ticked, or when a pushed commit message contains [ui-tests].
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.run_ui_tests)
+      || (github.event_name == 'push' && contains(github.event.head_commit.message, '[ui-tests]'))
     runs-on: macos-26
     timeout-minutes: 45
     steps:

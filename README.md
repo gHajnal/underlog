@@ -57,7 +57,7 @@ The UI tests launch the app with `-ui-testing`, which uses an in-memory log seed
 
 - **Core tests** run on Linux for every change to `UnderlogCore/`.
 - **iOS app** builds on a macOS runner when app code changes on `main`. UI tests run when started manually
-  from the Actions tab with "Also run the UI tests" ticked.
+  from the Actions tab with "Also run the UI tests" ticked, or when a pushed commit message contains `[ui-tests]`.
 
 ## Licence
 
