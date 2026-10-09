@@ -40,11 +40,14 @@ public struct LogStatistics: Sendable {
     public var divesPerYear: [YearCount]
     public var depthDistribution: [DepthBucket]
 
+    /// Depths beyond this go in the last bucket. Far deeper than any scuba dive, small enough to keep the chart bounded.
+    public static let maxChartedDepth = 1_000.0
+
     public init(dives: [DiveFacts], bucketSize: Double = 5, calendar: Calendar = .current) {
         totalDives = dives.count
         totalTime = dives.reduce(0) { $0 + $1.duration }
-        deepest = dives.max { $0.maxDepth < $1.maxDepth }
-        longest = dives.max { $0.duration < $1.duration }
+        deepest = dives.filter { $0.maxDepth.isFinite }.max { $0.maxDepth < $1.maxDepth }
+        longest = dives.filter { $0.duration.isFinite }.max { $0.duration < $1.duration }
         coldestTemperature = dives.compactMap(\.minTemperature).min()
         averageMaxDepth = dives.isEmpty ? 0 : dives.reduce(0) { $0 + $1.maxDepth } / Double(dives.count)
         averageDuration = dives.isEmpty ? 0 : totalTime / Double(dives.count)
@@ -52,8 +55,12 @@ public struct LogStatistics: Sendable {
         let byYear = Dictionary(grouping: dives) { calendar.component(.year, from: $0.startDate) }
         divesPerYear = byYear.map { YearCount(year: $0.key, dives: $0.value.count) }.sorted { $0.year < $1.year }
 
-        let size = max(bucketSize, 1)
-        let byBucket = Dictionary(grouping: dives) { Int(($0.maxDepth / size).rounded(.down)) }
+        // Guard against damaged data: a NaN, negative or absurd depth must not crash or hang the chart.
+        let size = bucketSize.isFinite ? max(bucketSize, 1) : 5
+        let charted = dives.filter { $0.maxDepth.isFinite && $0.maxDepth >= 0 }
+        let byBucket = Dictionary(grouping: charted) {
+            Int((min($0.maxDepth, Self.maxChartedDepth) / size).rounded(.down))
+        }
         if let top = byBucket.keys.max() {
             depthDistribution = (0...top).map { index in
                 DepthBucket(lower: Double(index) * size, upper: Double(index + 1) * size, dives: byBucket[index]?.count ?? 0)

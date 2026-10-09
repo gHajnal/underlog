@@ -24,6 +24,7 @@ struct GasToolsView: View {
             Form {
                 Section("Gas") {
                     PercentStepper(title: "Oxygen", value: $oxygenPercent, range: 1...100)
+                        .onChange(of: oxygenPercent) { _, oxygen in heliumPercent = min(heliumPercent, 100 - oxygen) }
                     PercentStepper(title: "Helium", value: $heliumPercent, range: 0...(100 - oxygenPercent))
                     Picker("Max ppO₂", selection: $maxPPO2) {
                         ForEach([1.2, 1.3, 1.4, 1.5, 1.6], id: \.self) { Text("\(UnitSystem.format($0, decimals: 1)) bar").tag($0) }

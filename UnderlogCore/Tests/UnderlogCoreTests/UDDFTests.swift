@@ -113,6 +113,45 @@ struct UDDFTests {
         #expect(reimported.notes == "<b>bold</b> & \"quoted\"")
     }
 
+    @Test func decoDataSurvivesRoundTrip() throws {
+        let dive = ImportedDive(
+            startDate: Date(), duration: 1800, maxDepth: 45,
+            samples: [
+                DiveSample(time: 0, depth: 0, noDecoTime: 5940),
+                DiveSample(time: 900, depth: 45, noDecoTime: 0, stopDepth: 6),
+                DiveSample(time: 1800, depth: 0),
+            ]
+        )
+        let reimported = try #require(UDDFImporter.importDives(from: UDDFExporter.export([dive])).first)
+        #expect(reimported.samples.map(\.noDecoTime) == [5940, 0, nil])
+        #expect(reimported.samples.map(\.stopDepth) == [nil, 6, nil])
+        #expect(DiveProfile(samples: reimported.samples).hadDecompressionStop)
+    }
+
+    @Test func damagedNumbersAreIgnoredNotCrashed() throws {
+        let xml = """
+        <uddf version="3.2.0"><profiledata><repetitiongroup><dive>
+          <informationbeforedive><datetime>2026-08-15T10:30:00</datetime><divenumber>1e30</divenumber></informationbeforedive>
+          <samples>
+            <waypoint><depth>0</depth><divetime>0</divetime></waypoint>
+            <waypoint><depth>nan</depth><divetime>60</divetime></waypoint>
+            <waypoint><depth>9.5</depth><divetime>120</divetime></waypoint>
+            <waypoint><depth>0</depth><divetime>240</divetime></waypoint>
+          </samples>
+          <informationafterdive>
+            <greatestdepth>nan</greatestdepth><diveduration>inf</diveduration>
+            <rating><ratingvalue>nan</ratingvalue></rating>
+          </informationafterdive>
+        </dive></repetitiongroup></profiledata></uddf>
+        """
+        let dive = try #require(UDDFImporter.importDives(from: Data(xml.utf8)).first)
+        #expect(dive.diveNumber == nil)
+        #expect(dive.rating == nil)
+        #expect(dive.maxDepth == 9.5)
+        #expect(dive.duration == 240)
+        #expect(dive.samples.count == 3)
+    }
+
     @Test func freediveModeSurvivesRoundTrip() throws {
         let dive = ImportedDive(
             startDate: Date(), duration: 90, maxDepth: 15, mode: .freedive,

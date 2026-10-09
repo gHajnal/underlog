@@ -225,8 +225,14 @@ struct CylinderSummary: View {
             HStack {
                 Text(cylinder.gas.name).font(.headline)
                 if let volume = cylinder.volumeLiters {
-                    Text(units == .metric ? "\(UnitSystem.format(volume, decimals: 1)) L" : "\(UnitSystem.format(units.volume(fromLiters: volume * (cylinder.workingPressureBar ?? 200)), decimals: 0)) cu ft")
-                        .foregroundStyle(.secondary)
+                    // Cubic feet describe gas capacity, which needs the real working pressure; never guess it.
+                    if units == .imperial, let working = cylinder.workingPressureBar {
+                        Text("\(UnitSystem.format(units.volume(fromLiters: volume * working), decimals: 0)) cu ft")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("\(UnitSystem.format(volume, decimals: 1)) L")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 if !cylinder.name.isEmpty {
                     Text(cylinder.name).foregroundStyle(.secondary)

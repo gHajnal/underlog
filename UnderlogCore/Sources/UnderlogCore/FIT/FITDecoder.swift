@@ -64,7 +64,9 @@ public enum FITDecoder {
         let dataSize = Int(readUInt(bytes, at: start + 4, size: 4, littleEndian: true))
         let dataStart = start + headerSize
         let declaredEnd = dataStart + dataSize
-        let end = min(declaredEnd, bytes.count)
+        // A file shorter than its header says was cut off, even if the cut falls between records.
+        guard declaredEnd <= bytes.count else { throw DecodingError.truncated }
+        let end = declaredEnd
 
         var definitions: [UInt8: Definition] = [:]
         var messages: [FITMessage] = []
@@ -79,8 +81,9 @@ public enum FITDecoder {
                 // Compressed timestamp header: local type in bits 5-6, time offset in bits 0-4.
                 let local = (header >> 5) & 0x03
                 let offset = UInt32(header & 0x1F)
-                var timestamp = (lastTimestamp & ~UInt32(0x1F)) + offset
-                if offset < (lastTimestamp & 0x1F) { timestamp += 0x20 }
+                // Wrapping arithmetic: a malformed file must not be able to crash the importer.
+                var timestamp = (lastTimestamp & ~UInt32(0x1F)) &+ offset
+                if offset < (lastTimestamp & 0x1F) { timestamp &+= 0x20 }
                 lastTimestamp = timestamp
                 guard let definition = definitions[local] else { throw DecodingError.undefinedLocalMessage(local) }
                 var message = try readData(bytes, at: &p, end: end, definition: definition)
@@ -96,7 +99,7 @@ public enum FITDecoder {
             } else {
                 guard let definition = definitions[local] else { throw DecodingError.undefinedLocalMessage(local) }
                 let message = try readData(bytes, at: &p, end: end, definition: definition)
-                if let ts = message.values[253] { lastTimestamp = UInt32(ts) }
+                if let ts = message.values[253], let exact = UInt32(exactly: ts) { lastTimestamp = exact }
                 messages.append(message)
             }
         }

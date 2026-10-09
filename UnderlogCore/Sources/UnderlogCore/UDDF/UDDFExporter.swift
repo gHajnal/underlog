@@ -103,6 +103,10 @@ public enum UDDFExporter {
                     if let t = sample.temperature { x.element("temperature", number(t + 273.15)) }
                     if let p = sample.tankPressure { x.element("tankpressure", number(p * 100_000)) }
                     if let hr = sample.heartRate { x.element("heartrate", number(hr)) }
+                    if let ndl = sample.noDecoTime { x.element("nodecotime", number(ndl)) }
+                    if let stop = sample.stopDepth, stop > 0 {
+                        x.empty("decostop", attributes: ["kind": "mandatory", "decodepth": number(stop), "duration": "0"])
+                    }
                     x.close("waypoint")
                 }
                 x.close("samples")

@@ -3,12 +3,12 @@ name: iOS app
 # macOS runners count 10x against the free Actions minutes on private repositories,
 # so the app build only runs when app code changes, and UI tests only on request
 # (manually from the Actions tab, or by putting [ui-tests] in a commit message).
+# Changes to UITests/ alone don't trigger a macOS build; run them from the Actions tab.
 on:
   push:
     branches: [main]
     paths:
       - "App/**"
-      - "UITests/**"
       - "UnderlogCore/Sources/**"
       - "project.yml"
       - ".github/workflows/ios-build.yml"
@@ -18,6 +18,14 @@ on:
         description: "Also run the UI tests in the simulator"
         type: boolean
         default: false
+
+permissions:
+  contents: read
+
+# A newer push cancels a macOS run still in progress, so minutes aren't spent on outdated code.
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:

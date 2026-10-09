@@ -69,6 +69,7 @@ public enum UnitSystem: String, Codable, CaseIterable, Sendable {
     }
 
     public static func formatDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite, abs(seconds) < 1e12 else { return "–" }
         let total = Int(max(seconds, 0).rounded())
         if total >= 3600 {
             let roundedMinutes = Int((Double(total) / 60).rounded())
@@ -81,18 +82,28 @@ public enum UnitSystem: String, Codable, CaseIterable, Sendable {
         return "\(Int((Double(total) / 60).rounded())) min"
     }
 
-    /// A spoken form of a duration, for VoiceOver.
+    /// A spoken form of a duration, for VoiceOver. Follows the same seconds rule as `formatDuration`.
     public static func spokenDuration(_ seconds: Double) -> String {
-        let minutes = Int((seconds / 60).rounded())
+        guard seconds.isFinite, abs(seconds) < 1e12 else { return "unknown duration" }
+        let total = Int(max(seconds, 0).rounded())
+        func plural(_ count: Int, _ unit: String) -> String { "\(count) \(unit)\(count == 1 ? "" : "s")" }
+
+        if total < 600, total % 60 != 0 {
+            let m = total / 60, s = total % 60
+            return m == 0 ? plural(s, "second") : "\(plural(m, "minute")) \(plural(s, "second"))"
+        }
+        let minutes = Int((Double(total) / 60).rounded())
         if minutes >= 60 {
             let h = minutes / 60, m = minutes % 60
-            return m == 0 ? "\(h) \(h == 1 ? "hour" : "hours")" : "\(h) \(h == 1 ? "hour" : "hours") \(m) minutes"
+            return m == 0 ? plural(h, "hour") : "\(plural(h, "hour")) \(plural(m, "minute"))"
         }
-        return "\(minutes) \(minutes == 1 ? "minute" : "minutes")"
+        return plural(minutes, "minute")
     }
 
     /// A number rounded to a fixed count of decimals, without a unit.
     public static func format(_ value: Double, decimals: Int) -> String {
+        // Non-finite or absurdly large values (only possible from damaged data) are shown as a dash, not converted to Int.
+        guard value.isFinite, abs(value) < 1e15 else { return "–" }
         let factor = pow(10, Double(decimals))
         let rounded = (value * factor).rounded() / factor
         if decimals == 0 { return String(Int(rounded)) }

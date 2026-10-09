@@ -132,7 +132,7 @@ struct ImportReviewView: View {
                                 .font(.headline)
                             Text("\(units.formatDepth(candidate.dive.maxDepth)) · \(UnitSystem.formatDuration(candidate.dive.duration))")
                                 .font(.subheadline)
-                            Text(candidate.isDuplicate ? "Probably already in your log" : candidate.fileName)
+                            Text(candidate.isDuplicate ? "Probably already in your log or listed above" : candidate.fileName)
                                 .font(.caption)
                                 .foregroundStyle(candidate.isDuplicate ? .orange : .secondary)
                         }
@@ -166,10 +166,14 @@ struct ImportReviewView: View {
         }
         let result = await ImportReader.read(files)
         failures += result.failures
+        // Compare with the log and with dives already listed, so the same dive picked twice
+        // (for example as a FIT and a UDDF file) is only ticked once.
+        var seenStartDates = session.existingStartDates
         candidates = result.dives
             .sorted { $0.1.startDate > $1.1.startDate }
             .map { name, dive in
-                let duplicate = session.existingStartDates.contains { DuplicateDetector.isLikelyDuplicate($0, dive.startDate) }
+                let duplicate = seenStartDates.contains { DuplicateDetector.isLikelyDuplicate($0, dive.startDate) }
+                seenStartDates.append(dive.startDate)
                 return ImportCandidate(dive: dive, fileName: name, isDuplicate: duplicate, isSelected: !duplicate)
             }
         isLoading = false

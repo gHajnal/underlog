@@ -89,7 +89,7 @@ struct FITTests {
     /// Chosen so that the low five bits are 25: compressed offsets then wrap past 31, which the decoder must handle.
     let t0: UInt32 = 1_000_000_025
 
-    func sampleDiveFile() -> Data {
+    func sampleDiveFile(withLapSummary: Bool = false) -> Data {
         var w = FITWriter()
 
         // file_id with product name
@@ -150,6 +150,10 @@ struct FITTests {
             F(number: 3, size: 4, baseType: T.uint32),
             F(number: 10, size: 4, baseType: T.uint32),
         ])
+        if withLapSummary {
+            // A lap summary (reference_mesg 19) written before the session's: it must not be used for the dive.
+            w.data(local: 6, [19, 5_000, 1])
+        }
         w.data(local: 6, [18, 18_000, 42])
 
         return w.file()
@@ -192,6 +196,40 @@ struct FITTests {
         #expect(throws: FITDecoder.DecodingError.notAFITFile) {
             try FITImporter.importDives(from: Data("hello, this is not a fit file".utf8))
         }
+    }
+
+    @Test func usesTheSessionSummaryNotALapSummary() throws {
+        let dive = try #require(FITImporter.importDives(from: sampleDiveFile(withLapSummary: true)).first)
+        #expect(dive.maxDepth == 18)
+        #expect(dive.diveNumber == 42)
+    }
+
+    @Test func detectsAFileCutAtARecordBoundary() {
+        // Remove the last data record (11 bytes) and the 2-byte CRC: what's left ends cleanly between records.
+        let data = sampleDiveFile()
+        #expect(throws: FITDecoder.DecodingError.truncated) {
+            try FITDecoder.decode(data.prefix(data.count - 13))
+        }
+    }
+
+    @Test func extremeTimestampsDoNotCrash() throws {
+        var w = FITWriter()
+        w.define(local: 0, global: 20, fields: [
+            F(number: 253, size: 4, baseType: T.uint32),
+            F(number: 92, size: 4, baseType: T.uint32),
+        ])
+        w.data(local: 0, [0xFFFF_FFE5, 1_000])
+        w.define(local: 1, global: 20, fields: [F(number: 92, size: 4, baseType: T.uint32)])
+        // Offset 2 is below the previous low bits (5), so the decoder adds a rollover that would overflow UInt32.
+        w.compressedData(local: 1, timestamp: 2, [2_000])
+        // A timestamp declared as a signed field with a negative value.
+        w.define(local: 2, global: 20, fields: [
+            F(number: 253, size: 4, baseType: T.sint32),
+            F(number: 92, size: 4, baseType: T.uint32),
+        ])
+        w.data(local: 2, [UInt64(UInt32(bitPattern: -50)), 3_000])
+        let messages = try FITDecoder.decode(w.file())
+        #expect(messages.count == 3)
     }
 
     @Test func detectsTruncatedFiles() {

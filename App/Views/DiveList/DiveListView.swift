@@ -157,7 +157,7 @@ struct DiveSection: Identifiable {
     var dives: [Dive]
 
     /// Keys can repeat when a trip's dives are interleaved with others, so the id includes the first dive.
-    var id: String { "\(key)-\(dives.first?.persistentModelID.hashValue ?? 0)" }
+    var id: String { "\(key)-\(dives.first.map { "\($0.persistentModelID)" } ?? "")" }
 }
 
 private struct SectionHeader: View {

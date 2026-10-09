@@ -25,6 +25,20 @@ struct ProfileAndUnitsTests {
         #expect(abs(square.maxAscentRate(window: 30) - 10) < 1e-9)
     }
 
+    @Test func ascentRateIgnoresSingleSampleNoise() {
+        // A 2 m jump between two samples one second apart would read as 120 m/min without the window.
+        var samples = (0...120).map { DiveSample(time: Double($0), depth: 20) }
+        samples[61].depth = 18
+        samples[62].depth = 20
+        let rate = DiveProfile(samples: samples).maxAscentRate(window: 30)
+        #expect(rate < 5)
+    }
+
+    @Test func ascentRateIsZeroForAProfileShorterThanTheWindow() {
+        let short = DiveProfile(samples: [DiveSample(time: 0, depth: 10), DiveSample(time: 20, depth: 0)])
+        #expect(short.maxAscentRate(window: 30) == 0)
+    }
+
     @Test func profileCleansInput() {
         let messy = DiveProfile(samples: [
             DiveSample(time: 20, depth: 5),
@@ -85,10 +99,57 @@ struct ProfileAndUnitsTests {
         #expect(UnitSystem.formatDuration(seconds) == text)
     }
 
-    @Test func spokenDurations() {
-        #expect(UnitSystem.spokenDuration(2700) == "45 minutes")
-        #expect(UnitSystem.spokenDuration(3600) == "1 hour")
-        #expect(UnitSystem.spokenDuration(5400) == "1 hour 30 minutes")
+    @Test(arguments: [
+        (2700.0, "45 minutes"),
+        (3600.0, "1 hour"),
+        (3660.0, "1 hour 1 minute"),
+        (5400.0, "1 hour 30 minutes"),
+        (7200.0, "2 hours"),
+        (25.0, "25 seconds"),
+        (61.0, "1 minute 1 second"),
+        (330.0, "5 minutes 30 seconds"),
+        (60.0, "1 minute"),
+    ])
+    func spokenDurations(seconds: Double, text: String) {
+        #expect(UnitSystem.spokenDuration(seconds) == text)
+    }
+
+    @Test func formattingNeverTrapsOnDamagedValues() {
+        #expect(UnitSystem.format(.nan, decimals: 0) == "–")
+        #expect(UnitSystem.format(.infinity, decimals: 1) == "–")
+        #expect(UnitSystem.format(1e30, decimals: 0) == "–")
+        #expect(UnitSystem.imperial.formatDepth(.nan) == "– ft")
+        #expect(UnitSystem.formatDuration(.nan) == "–")
+        #expect(UnitSystem.spokenDuration(.infinity) == "unknown duration")
+    }
+
+    @Test func statisticsForAnEmptyLog() {
+        let stats = LogStatistics(dives: [])
+        #expect(stats.totalDives == 0)
+        #expect(stats.averageMaxDepth == 0)
+        #expect(stats.averageDuration == 0)
+        #expect(stats.depthDistribution.isEmpty)
+        #expect(stats.deepest == nil)
+    }
+
+    @Test func statisticsSurviveDamagedDepths() {
+        let now = Date()
+        let stats = LogStatistics(dives: [
+            DiveFacts(startDate: now, duration: 60, maxDepth: .nan),
+            DiveFacts(startDate: now, duration: 60, maxDepth: -4),
+            DiveFacts(startDate: now, duration: 60, maxDepth: .infinity),
+            DiveFacts(startDate: now, duration: 60, maxDepth: 1e9),
+            DiveFacts(startDate: now, duration: 60, maxDepth: 12),
+        ], bucketSize: .nan)
+        // Absurd depths are capped, so the chart stays bounded.
+        #expect(stats.depthDistribution.count <= Int(LogStatistics.maxChartedDepth / 5) + 1)
+        #expect(stats.depthDistribution.reduce(0) { $0 + $1.dives } == 2)
+        #expect(stats.deepest?.maxDepth == 1e9)
+    }
+
+    @Test func statisticsWithOnlyNegativeDepthsDoNotTrap() {
+        let stats = LogStatistics(dives: [DiveFacts(startDate: Date(), duration: 60, maxDepth: -1)])
+        #expect(stats.depthDistribution.isEmpty)
     }
 
     @Test func logStatistics() {

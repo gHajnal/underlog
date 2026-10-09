@@ -99,12 +99,15 @@ public enum UDDFImporter {
             sample.tankPressure = waypoint.child("tankpressure")?.doubleValue.map { $0 / 100_000 }
             sample.heartRate = waypoint.child("heartrate")?.doubleValue
             sample.noDecoTime = waypoint.child("nodecotime")?.doubleValue
+            sample.stopDepth = waypoint.child("decostop")?.attributes["decodepth"]
+                .flatMap(Double.init).flatMap { $0.isFinite ? $0 : nil }
             samples.append(sample)
         }
 
         let notes = after?.child("notes")?.children("para").map(\.trimmedText).filter { !$0.isEmpty }.joined(separator: "\n\n")
         // UDDF ratings run from 1 to 10; the app uses 1 to 5.
-        let rating = after?.path("rating", "ratingvalue")?.doubleValue.map { min(max(Int(($0 / 2).rounded(.up)), 1), 5) }
+        let rating = after?.path("rating", "ratingvalue")?.doubleValue
+            .flatMap { Int(exactly: (min(max($0, 1), 10) / 2).rounded(.up)) }
 
         var dive = ImportedDive(
             startDate: startDate,
@@ -112,7 +115,7 @@ public enum UDDFImporter {
             maxDepth: after?.child("greatestdepth")?.doubleValue ?? 0,
             averageDepth: after?.child("averagedepth")?.doubleValue,
             minTemperature: after?.child("lowesttemperature")?.doubleValue.map { $0 - 273.15 },
-            diveNumber: before?.child("divenumber")?.doubleValue.map { Int($0) },
+            diveNumber: before?.child("divenumber")?.doubleValue.flatMap { Int(exactly: $0.rounded()) },
             mode: mode,
             cylinders: cylinders,
             samples: samples,

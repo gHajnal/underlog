@@ -44,7 +44,9 @@ public final class XMLElementNode: @unchecked Sendable {
     }
 
     public var trimmedText: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-    public var doubleValue: Double? { Double(trimmedText) }
+    /// The text as a finite number, or nil. UDDF never uses NaN or infinity, and accepting them would
+    /// let a damaged file put impossible values into the log.
+    public var doubleValue: Double? { Double(trimmedText).flatMap { $0.isFinite ? $0 : nil } }
 
     var localName: String {
         let lower = name.lowercased()

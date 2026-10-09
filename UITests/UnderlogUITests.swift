@@ -54,8 +54,7 @@ final class UnderlogUITests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.otherElements[ID.detailMaxDepth].waitForExistence(timeout: 5)
             || app.staticTexts["Max depth"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.otherElements[ID.profileChart].exists || app.images[ID.profileChart].exists
-            || app.descendants(matching: .any)[ID.profileChart].exists)
+        XCTAssertTrue(app.descendants(matching: .any)[ID.profileChart].waitForExistence(timeout: 5))
     }
 
     @MainActor

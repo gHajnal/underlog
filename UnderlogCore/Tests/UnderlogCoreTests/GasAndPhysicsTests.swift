@@ -9,7 +9,8 @@ struct GasAndPhysicsTests {
     }
 
     @Test func freshWaterAddsLessPressure() {
-        #expect(Physics.absolutePressure(atDepth: 30, water: .fresh) < Physics.absolutePressure(atDepth: 30, water: .salt))
+        #expect(abs(Physics.absolutePressure(atDepth: 30, water: .fresh) - 3.955) < 0.001)
+        #expect(abs(Physics.absolutePressure(atDepth: 30, water: .salt) - 4.029) < 0.001)
     }
 
     @Test func depthAndPressureAreInverse() {
@@ -31,7 +32,7 @@ struct GasAndPhysicsTests {
         let trimix = GasMix(oxygen: 0.21, helium: 0.35)
         #expect(abs(GasCalculator.equivalentNarcoticDepth(trimix, atDepth: 60) - 35.47) < 0.05)
         // Without counting oxygen as narcotic the END is shallower.
-        #expect(GasCalculator.equivalentNarcoticDepth(trimix, atDepth: 60, oxygenIsNarcotic: false) < 35.47)
+        #expect(abs(GasCalculator.equivalentNarcoticDepth(trimix, atDepth: 60, oxygenIsNarcotic: false) - 28.95) < 0.05)
     }
 
     @Test func equivalentAirDepthForNitrox() {

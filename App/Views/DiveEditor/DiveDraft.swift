@@ -120,7 +120,8 @@ struct DiveDraft {
             dive.site?.longitude = longitude
         } else {
             dive.site = Logbook.site(named: siteName, in: context)
-            if let site = dive.site {
+            // The site is shared by every dive there, so only overwrite its position with a complete new one.
+            if let site = dive.site, let latitude, let longitude {
                 site.latitude = latitude
                 site.longitude = longitude
             }

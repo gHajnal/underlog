@@ -7,10 +7,16 @@ import UnderlogCore
 struct ProfileChartView: View {
     let profile: DiveProfile
     let units: UnitSystem
+    /// Downsampled once per profile, not on every redraw while scrubbing.
+    private let points: [DiveSample]
 
     @State private var selectedMinute: Double?
 
-    private var points: [DiveSample] { profile.downsampled(maxPoints: 400) }
+    init(profile: DiveProfile, units: UnitSystem) {
+        self.profile = profile
+        self.units = units
+        self.points = profile.downsampled(maxPoints: 400)
+    }
 
     var body: some View {
         Chart {

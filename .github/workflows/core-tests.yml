@@ -8,7 +8,15 @@ on:
   pull_request:
     paths:
       - "UnderlogCore/**"
+      - ".github/workflows/core-tests.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

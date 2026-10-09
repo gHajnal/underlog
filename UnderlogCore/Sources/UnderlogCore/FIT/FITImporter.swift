@@ -41,6 +41,9 @@ public enum FITImporter {
     static func dives(from messages: [FITMessage]) throws -> [ImportedDive] {
         let records = messages.filter { $0.globalNumber == Message.record && $0.value(253) != nil }
         let summaries = messages.filter { $0.globalNumber == Message.diveSummary }
+        // A file can hold summaries for laps as well as sessions. Field 0 (reference_mesg) says which
+        // kind a summary describes and field 1 (reference_index) which one, so match by reference.
+        let sessionSummaries = summaries.filter { $0.value(0) == Double(Message.session) }
         let sessions = messages.filter { $0.globalNumber == Message.session }
 
         let hasDepth = records.contains { $0.value(92) != nil }
@@ -69,17 +72,19 @@ public enum FITImporter {
         let tankSummary = messages.first { $0.globalNumber == Message.tankSummary }
 
         // One dive per session window when sessions are present, otherwise the whole file is one dive.
-        let windows: [(start: Double, end: Double, session: FITMessage?)]
-        let sessionWindows = sessions.compactMap { session -> (start: Double, end: Double, session: FITMessage?)? in
+        let windows: [(start: Double, end: Double, session: FITMessage?, sessionIndex: Int?)]
+        let sessionWindows = sessions.enumerated().compactMap { position, session -> (start: Double, end: Double, session: FITMessage?, sessionIndex: Int?)? in
             guard let start = session.value(2) ?? session.value(253) else { return nil }
             let elapsed = (session.value(7) ?? 0) / 1000
-            return (start: start, end: elapsed > 0 ? start + elapsed : .infinity, session: session)
+            // A session's own message_index (field 254) is what summaries refer to; fall back to its position.
+            let sessionIndex = session.value(254).flatMap { Int(exactly: $0) } ?? position
+            return (start: start, end: elapsed > 0 ? start + elapsed : .infinity, session: session, sessionIndex: sessionIndex)
         }
         if !sessionWindows.isEmpty {
             windows = sessionWindows.sorted { $0.start < $1.start }
         } else {
             let first = records.compactMap { $0.value(253) }.min() ?? 0
-            windows = [(first, .infinity, nil)]
+            windows = [(first, .infinity, nil, nil)]
         }
 
         var dives: [ImportedDive] = []
@@ -88,7 +93,14 @@ public enum FITImporter {
                 guard let t = $0.value(253) else { return false }
                 return t >= window.start && t <= window.end
             }
-            let summary = summaries.indices.contains(index) ? summaries[index] : summaries.last
+            let summary: FITMessage?
+            if !sessionSummaries.isEmpty {
+                summary = window.sessionIndex.flatMap { sessionIndex in
+                    sessionSummaries.first { $0.value(1) == Double(sessionIndex) }
+                } ?? (sessionSummaries.count == 1 ? sessionSummaries[0] : nil)
+            } else {
+                summary = summaries.indices.contains(index) ? summaries[index] : summaries.last
+            }
             let start = window.start
 
             let samples: [DiveSample] = windowRecords.compactMap { record in
@@ -128,7 +140,7 @@ public enum FITImporter {
                 maxDepth: (summary?.value(3)).map { $0 / 1000 } ?? profile.maxDepth,
                 averageDepth: (summary?.value(2)).map { $0 / 1000 },
                 minTemperature: profile.minTemperature,
-                diveNumber: (summary?.value(10)).map { Int($0) },
+                diveNumber: (summary?.value(10)).flatMap { Int(exactly: $0.rounded()) },
                 mode: mode,
                 cylinders: cylinders,
                 samples: profile.samples,
