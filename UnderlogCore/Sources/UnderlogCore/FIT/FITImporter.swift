@@ -146,7 +146,7 @@ public enum FITImporter {
 
     static func diveMode(subSport: Double?) -> DiveMode {
         guard let subSport else { return .openCircuit }
-        switch subSport {
+        return switch subSport {
         case SubSport.gauge: .gauge
         case SubSport.apnea, SubSport.apneaHunting: .freedive
         case SubSport.ccr: .closedCircuitRebreather
